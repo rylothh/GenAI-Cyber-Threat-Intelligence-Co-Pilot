@@ -1,0 +1,457 @@
+# --- 1. THE DEFINITIVE "ANALYST'S CO-PILOT" SCRIPT v8.2.0 ---
+# COMPATIBILITY: Hardened for PS 5.1 CLM.
+# FEATURES: Exact Ticket Match and Interactive Chat. WhoIs ARIN collection for Source.
+
+$ErrorActionPreference = 'SilentlyContinue'
+
+# --- API KEYS ---
+#Otx Key currently unused (v8.2.0)
+$VT_Key = "fa40bdb30439099b2313774978bdce53f4bdd178958bdb6ba9053f9714e08a5a"
+$Abuse_Key = "56e1443cb048ba5f787bfc3cd8159a76457c0742d9fffcf55ba105972ce2e05c6f558874c2cc3184"
+$Otx_Key = "b9b3ef6fb945cc841c12d2f145b2bb84782b873c36f1da847ce1b20489b8edbc"
+$UrlScan_Key = "019d6e75-932d-7528-a108-90747e17fec3"
+
+# --- GenAI API CONFIGURATION ---
+$GenAI_Key = "xxx"
+$GenAI_Endpoint = "https://api.genai.mil/v1/chat/completions"
+$GenAI_Model = "gemini-2.5-flash"
+
+# --- EMBEDDED INTERNAL DATABASE ---
+$Global:BdeDataRaw = @"
+Location,BDE,MACOM,AORStatus
+Raven Rock PA,21st BDE,DA,WITHIN AOR
+Aberdeen Proving Ground MD,93rd BDE,AMC/DREN,WITHIN AOR
+Adelphi MD,93rd BDE,AMC,WITHIN AOR
+Alexandria VA,93rd BDE,DA/DREN,WITHIN AOR
+Arden Hills MN,93rd BDE,TADLP,WITHIN AOR
+Arlington Heights IL,93rd BDE,TADLP,WITHIN AOR
+Birmingham AL,93rd BDE,USARC,WITHIN AOR
+Blount Island FL,93rd BDE,SDDC,WITHIN AOR
+Blue Grass AD KY,93rd BDE,AMC,WITHIN AOR
+Cape Canaveral FL,93rd BDE,0,WITHIN AOR
+Carlisle Barracks PA,93rd BDE,TRADOC,WITHIN AOR
+Chambersburg PA,93rd BDE,0,WITHIN AOR
+Charlotte NC,93rd BDE,USARC,WITHIN AOR
+Charlottesville VA,93rd BDE,0,WITHIN AOR
+Columbus OH,93rd BDE,TADLP,WITHIN AOR
+Coraopolis PA,93rd BDE,0,WITHIN AOR
+Crane AD IN,93rd BDE,AMC,WITHIN AOR
+CSS SATCOM/DWTS VA,93rd BDE,MDW,WITHIN AOR
+Springfield VA,93rd BDE,0,WITHIN AOR
+Decatour GA,93rd BDE,0,WITHIN AOR
+Edgewood MD,93rd BDE,0/MEDCOM,WITHIN AOR
+Fairmont WV,93rd BDE,DA,WITHIN AOR
+Falls Church VA,93rd BDE,0/MEDCOM,WITHIN AOR
+Ft Walker VA (Known as Ft AP Hill),93rd BDE,0,WITHIN AOR
+Ft Belvoir VA,93rd BDE,MDW/DREN,WITHIN AOR
+Ft Benning GA,93rd BDE,TRADOC,WITHIN AOR
+Ft Liberty NC (Known as Ft Bragg),93rd BDE,FORSCOM,WITHIN AOR
+Ft Buchanan PR,93rd BDE,SOUTHCOM,WITHIN AOR
+Ft Campbell KY,93rd BDE,FORSCOM,WITHIN AOR
+Ft Detrick MD,93rd BDE,MEDCOM,WITHIN AOR
+Ft Devens MA,93rd BDE,USARC,WITHIN AOR
+Ft Dix NJ,93rd BDE,USARC,WITHIN AOR
+Ft Drum NY,93rd BDE,FORSCOM,WITHIN AOR
+Ft Eustis VA,93rd BDE,TRADOC,WITHIN AOR
+Ft Gillem GA,93rd BDE,FORSCOM,WITHIN AOR
+Ft Eisenhower GA (Known as Ft Gordon),93rd BDE,TRADOC,WITHIN AOR
+Ft Hamilton NY,93rd BDE,0,WITHIN AOR
+Ft Jackson SC,93rd BDE,TRADOC,WITHIN AOR
+Ft Knox KY,93rd BDE,TRADOC,WITHIN AOR
+Ft Gregg-Adams VA (Known as Ft Lee),93rd BDE,TRADOC,WITHIN AOR
+Ft McClellan AL,93rd BDE,TRADOC,WITHIN AOR
+Ft McNair DC,93rd BDE,MDW,WITHIN AOR
+Ft Meade MD,93rd BDE,MDW,WITHIN AOR
+Ft Monmouth NJ,93rd BDE,AMC,WITHIN AOR
+Ft Myer VA,93rd BDE,MDW,WITHIN AOR
+Ft Riley KS,93rd BDE,FORSCOM,WITHIN AOR
+Ft Novolsel AL (Known as Ft Rucker),93rd BDE,TRADOC,WITHIN AOR
+Ft Stewart GA,93rd BDE,FORSCOM,WITHIN AOR
+Goose Creek SC,93rd BDE,0,WITHIN AOR
+Hanover - RDE Site NH,93rd BDE,0,WITHIN AOR
+Harrisburg PA,93rd BDE,0,WITHIN AOR
+Hinton WV,93rd BDE,0,WITHIN AOR
+Holston TN,93rd BDE,AMC,WITHIN AOR
+Indianapolis HRC IN,93rd BDE,0,WITHIN AOR
+Jacksonville FL,93rd BDE,0,WITHIN AOR
+Latham NY,93rd BDE,TADLP,WITHIN AOR
+Letterkenny AD PA,93rd BDE,AMC,WITHIN AOR
+Louisville KY,93rd BDE,TADLP,WITHIN AOR
+Marlton NJ,93rd BDE,0,WITHIN AOR
+McLean VA,93rd BDE,0,WITHIN AOR
+Miami FL,93rd BDE,0,WITHIN AOR
+Milan AAP TN,93rd BDE,AMC,WITHIN AOR
+Mobile AL,93rd BDE,0,WITHIN AOR
+Montgomery AL,93rd BDE,TADLP,WITHIN AOR
+Moorestown NJ,93rd BDE,DA,WITHIN AOR
+Nashville TN,93rd BDE,0,WITHIN AOR
+Natick MA,93rd BDE,AMC,WITHIN AOR
+New Cumberland PA,93rd BDE,0,WITHIN AOR
+Newport Chemical Depot IN,93rd BDE,0,WITHIN AOR
+Newport News (DLS),93rd BDE,TRADOC,WITHIN AOR
+Norfolk VA,93rd BDE,MTMC,WITHIN AOR
+Oakdale PA,93rd BDE,0,WITHIN AOR
+Orlando FL,93rd BDE,AMC,WITHIN AOR
+Perrine FL,93rd BDE,0,WITHIN AOR
+Picatinny NJ,93rd BDE,AMC/DREN,WITHIN AOR
+Radford VA,93rd BDE,DA,WITHIN AOR
+Richmond VA,93rd BDE,TADLP,WITHIN AOR
+Rochester NY,93rd BDE,0,WITHIN AOR
+Seneca NY,93rd BDE,AMC,WITHIN AOR
+St Petersburg FL,93rd BDE,TADLP,WITHIN AOR
+Sunny Point NC,93rd BDE,MTMC,WITHIN AOR
+Tampa FL,93rd BDE,TADLP,WITHIN AOR
+Washington DC,93rd BDE,0,WITHIN AOR
+Tobyhanna PA,93rd BDE,AMC,WITHIN AOR
+Triangle Park NC,93rd BDE,AMC,WITHIN AOR
+Vienna VA,93rd BDE,DA,WITHIN AOR
+Walter Reed / WRAIR DC,93rd BDE,AMC,OUT OF AOR
+Watervliet NY,21st BDE,AMC/DREN,WITHIN AOR
+West Point NY,93rd BDE,USMA,WITHIN AOR
+Wichita Reserves KS,93rd BDE,USARC,WITHIN AOR
+Yuma PG AZ,93rd BDE,ATEC,WITHIN AOR
+Albuquerque NM,106th BDE,0,WITHIN AOR
+Anniston AL,106th BDE,AMC,WITHIN AOR
+Baton Rouge LA,106th BDE,0,WITHIN AOR
+Beaumont TX,106th BDE,0,WITHIN AOR
+Bell CA,106th BDE,0,WITHIN AOR
+Belton MO,106th BDE,0,WITHIN AOR
+Bossier City LA,106th BDE,0,WITHIN AOR
+Brooks AMC TX,106th BDE,0,WITHIN AOR
+Camp JT Robinson AR,106th BDE,0,WITHIN AOR
+Camp Parks CA,106th BDE,0,WITHIN AOR
+Camp Roberts CA,106th BDE,NGB,WITHIN AOR
+Champaign IL,106th BDE,NGB,WITHIN AOR
+Cheyenne WY,106th BDE,USACE,WITHIN AOR
+Chicago IL,106th BDE,MEPCOM,WITHIN AOR
+Colorado Springs CO,106th BDE,0,WITHIN AOR
+Concord CA,106th BDE,MTMC,WITHIN AOR
+Corpus Christi TX,106th BDE,AMC,WITHIN AOR
+Dallas TX,106th BDE,0,WITHIN AOR
+Des Moines IA,106th BDE,0,WITHIN AOR
+Deseret Chemical Depot UT,106th BDE,AMC,WITHIN AOR
+Detroit Arsenal / Warren MI,106th BDE,AMC,WITHIN AOR
+Dugway UT,106th BDE,AMC/DREN,WITHIN AOR
+Fairfield CA,106th BDE,AMC,WITHIN AOR
+Ft Bliss TX,106th BDE,TRADOC,WITHIN AOR
+Ft Carson CO,106th BDE,FORSCOM,WITHIN AOR
+Ft Cavazos TX (Known as Ft Hood),106th BDE,FORSCOM,WITHIN AOR
+Ft Huachuca AZ,106th BDE,TRADOC,WITHIN AOR
+Ft Irwin CA,106th BDE,FORSCOM,WITHIN AOR
+Ft Leonard Wood MO,106th BDE,TRADOC,WITHIN AOR
+Ft Lewis WA,106th BDE,FORSCOM,WITHIN AOR
+Ft McCoy WI,106th BDE,USARC,WITHIN AOR
+Ft Johnson LA (Known as Ft Polk),106th BDE,FORSCOM,WITHIN AOR
+Ft Sam Houston TX,106th BDE,TRADOC,WITHIN AOR
+Ft Sheridan IL,106th BDE,TADLP,WITHIN AOR
+Ft Sill OK,106th BDE,TRADOC,WITHIN AOR
+Grand Prairie TX,106th BDE,0,WITHIN AOR
+Grand Rapids MI,106th BDE,0,WITHIN AOR
+Grisson AFB IN,106th BDE,0,WITHIN AOR
+Hawthorne NV,106th BDE,AMC,WITHIN AOR
+Hunter-Liggett CA,106th BDE,USARC,WITHIN AOR
+Indianapolis EREC IN,106th BDE,TADLP,WITHIN AOR
+Johnston IA,106th BDE,NGB,WITHIN AOR
+Lake City AAP MO,106th BDE,AMC,WITHIN AOR
+Los Angeles CA,106th BDE,0,WITHIN AOR
+Mare Island CA,106th BDE,MTMC,WITHIN AOR
+McAlester AD OK,106th BDE,AMC,WITHIN AOR
+Millington TN,106th BDE,TADLP,WITHIN AOR
+Milwaukee WI,106th BDE,TADLP,WITHIN AOR
+New Orleans LA,106th BDE,USARC,WITHIN AOR
+Pasadena TX,106th BDE,0,WITHIN AOR
+Pine Bluff AR,106th BDE,AMC,WITHIN AOR
+Presidio Monterey CA,106th BDE,TRADOC,WITHIN AOR
+Pueblo Chemical Depot CO,106th BDE,AMC,WITHIN AOR
+Red River TX,106th BDE,AMC,WITHIN AOR
+Redstone Arsenal AL,106th BDE,AMC,WITHIN AOR
+Rock Island IL,106th BDE,AMC,WITHIN AOR
+Rocky Mountain Arsenal CO,106th BDE,AMC,WITHIN AOR
+Salt Lake City UT,106th BDE,0,WITHIN AOR
+Seattle WA,106th BDE,MTMC,WITHIN AOR
+Sherman Oaks CA,106th BDE,0,WITHIN AOR
+Sierra AD CA,106th BDE,AMC,WITHIN AOR
+Southfield MI,106th BDE,0,WITHIN AOR
+St Louis MO,106th BDE,DA,WITHIN AOR
+Tooele UT,106th BDE,AMC,WITHIN AOR
+Topeka KS,106th BDE,MTMC,WITHIN AOR
+Umatilla Chemical Depot OR,106th BDE,AMC,WITHIN AOR
+White Sands NM,106th BDE,AMC/DREN,WITHIN AOR
+Wichita Reserves KS,106th BDE,USARC,WITHIN AOR
+Yuma PG AZ,106th BDE,ATEC,WITHIN AOR
+Edgewood AMEDD MD,MEDCOM BDE,MEDCOM,WITHIN AOR
+Falls Church VA,MEDCOM BDE,MEDCOM,WITHIN AOR
+Ft Detrick MD,MEDCOM BDE,MEDCOM,WITHIN AOR
+Ft Sam Houston TX,MEDCOM BDE,MEDCOM,WITHIN AOR
+Arlington VA,NGB BDE,NGB,WITHIN AOR
+Arlington Hall Station VA,NGB BDE,NGB,WITHIN AOR
+Ft Bragg NC,Reserves BDE,USARC,OUT OF AOR
+Vicksburg MS,Reserves BDE,DREN,WITHIN AOR
+Ft Moore GA (Known as Ft Benning),106TH,DREN,WITHIN AOR
+Ft Gordon GA,106TH,DREN,WITHIN AOR
+Ft Leavenworth KS,106TH,DREN,WITHIN AOR
+ANYTHING,USACE BDE,USACE,WITHIN AOR
+Ft Bragg NC,SOCOM BDE,SOCOM,OUT OF AOR
+Belvoir VA,AKO BDE,Out of AOR,OUT OF AOR
+Belvoir VA,21ST BDE,Out of AOR,OUT OF AOR
+"@
+$Global:BdeMasterList = ConvertFrom-Csv $Global:BdeDataRaw
+
+# --- CORE API WRAPPER & HELPER FUNCTIONS ---
+function Invoke-SafeRest {
+    param($Uri, $Headers, $Method = 'Get', $Body)
+    try {
+        $params = @{ Uri = $Uri; Method = $Method; TimeoutSec = 25 }
+        if ($Headers) { $params.Headers = $Headers }
+        if ($Body) { $params.Body = $Body }
+        return Invoke-RestMethod @params
+    } catch { return $null }
+}
+
+function Get-BdeInfo {
+    param([string]$SearchLocation)
+    $Result = @{ Location = $SearchLocation; BDE = "(Check manual list)"; MACOM = "(Check manual list)"; AORStatus = "OUT OF AOR (Not in Master List)" }
+    
+    if ([string]::IsNullOrWhiteSpace($SearchLocation) -or $SearchLocation -eq "N/A") { 
+        $Result.Location = "(Check https://www.nic.mil/cgi-bin/whoisweb)"
+        $Result.AORStatus = "UNKNOWN"
+        return $Result 
+    }
+    
+    foreach ($Row in $Global:BdeMasterList) {
+        if ($Row.Location -match [regex]::Escape($SearchLocation) -or $SearchLocation -match [regex]::Escape($Row.Location)) {
+            $Result.Location = $Row.Location 
+            $Result.BDE = $Row.BDE
+            $Result.MACOM = $Row.MACOM
+            $Result.AORStatus = $Row.AORStatus
+            break
+        }
+    }
+    return $Result
+}
+
+# HELPER: Modular NSLookup
+function Get-NsLookup {
+    param($Target)
+    if ([string]::IsNullOrWhiteSpace($Target) -or $Target -eq "N/A") { return "N/A" }
+    
+    $NsRaw = cmd.exe /c "nslookup $Target 2>&1" | Out-String
+    if ($NsRaw -match "Non-existent domain|can't find|NXDOMAIN|\*\*\*") {
+        return "Non-existent domain"
+    } elseif ([string]::IsNullOrWhiteSpace($NsRaw)) {
+        return "Non-existent domain"
+    } elseif ($NsRaw -match "(?im)^Name:\s+(.+)") {
+        return $Matches[1].Trim()
+    } else {
+        return $NsRaw.Trim()
+    }
+}
+
+# HELPER: Modular ARIN RDAP with Variance Handling
+function Get-RdapInfo {
+    param($IP)
+    $Result = @{ NetRange = "N/A"; NetName = "N/A"; Type = "N/A"; Country = "N/A" }
+    if ([string]::IsNullOrWhiteSpace($IP) -or $IP -eq "N/A") { return $Result }
+    Write-Host "[!] Querying ARIN RDAP for $IP..." -ForegroundColor Cyan
+    $RdapRes = Invoke-SafeRest -Uri "https://rdap.arin.net/registry/ip/$IP" -Headers @{ "Accept" = "application/rdap+json" }
+    
+    if ($RdapRes) {
+        # Handle Variance: NetRange / inetnum / startAddress
+        if ($RdapRes.handle) { $Result.NetRange = $RdapRes.handle }
+        elseif ($RdapRes.startAddress -and $RdapRes.endAddress) { $Result.NetRange = "$($RdapRes.startAddress) - $($RdapRes.endAddress)" }
+        elseif ($RdapRes.inetnum) { $Result.NetRange = $RdapRes.inetnum }
+        
+        # Handle Name and Type
+        if ($RdapRes.name) { $Result.NetName = $RdapRes.name }
+        if ($RdapRes.type) { $Result.Type = $RdapRes.type }
+        if ($RdapRes.country) { $Result.Country = $RdapRes.country }
+    }
+    return $Result
+}
+
+# --- GENAI ANALYSIS ---
+function Invoke-AIAnalysis {
+    param($ContextData, $ElasticRule)
+    Write-Host "[i] Requesting AI Intelligence Analysis..." -ForegroundColor Magenta
+    $Headers = @{ "Authorization" = "Bearer $GenAI_Key"; "Content-Type" = "application/json" }
+    $Prompt = "Expert cyber incident handling analysis. Plain text only!!! Avoid usage of unintelligible non-English ascii-style formatting where not commanded in this prompt. Do not use emojis. Do not use HTML/CSS formatting to bold/italics/list or order, etc as it will not work in plaintext. If producing a URL, file hash, or filepath from a potentially malicious payload, obfuscate or defang the URL by placing brackets around the colons, and replace 'https' with 'hxxps' by whatever means necessary to prevent it from highlighting as an embedded URL or hyperlink, to prevent accidental clicking. DO NOT defang or obfuscate IPs. When writing in the 'CSSP Analysis' section, write only your analysis; no extra formatting such as hyphens, linebreaks, etcetera are required, and no title is required as your prompt is pre-formatted to inject into a Powershell script outside of Gemini. Be detailed yet concise. Analyze the provided telemetry based on the information gathered via open source intelligence using the embedded API keys. The alert triggered on this Elastic Rule: '$ElasticRule'. 1 paragraph summary assessing the relationship between these indicators and the rule. DO NOT SAY ANYTHING ALONG THE LINES OF 'I, Gemini Enterprise, have analyzed the network telemetry involving source IP 3.5.12.238 and target IP 65.116.218.113.' Do not acknowledge yourself in your analysis. Do not write any suggestions or recommendations; write only the facts that have been observed with open source material." + $ContextData
+    $Payload = @{ model = $GenAI_Model; messages = @(@{ role = "user"; content = $Prompt }) } | ConvertTo-Json -Depth 10
+    $Response = Invoke-SafeRest -Uri $GenAI_Endpoint -Method Post -Headers $Headers -Body $Payload
+    if ($Response) { return $Response.choices[0].message.content.Trim() }
+    return "AI Analysis failed to generate a response. Resend another request as this may have been a parsing issue. If this occurs multiple times and is not due to network access or admin restrictions, check that the GenAI API key in this code is unlocked or active as the key may have expired. Go to https://genai.mil/stark/user-ui/ for new API keys. If the key does not belong to you, generate a personal API key at the URL and add it to line 15 in this repository. Other portions of this repository may need to be updated (especially API keys) if the code continues to fail at total execution."
+}
+
+# --- INTERACTIVE CHAT SESSION ---
+function Start-AIChat {
+    param($Context, $Verdict, $ElasticRule)
+    Write-Host "`n--- AI CHAT MODE ACTIVATED ---" -ForegroundColor Magenta
+    Write-Host "Type 'done' to exit.`n" -ForegroundColor Gray
+    $History = @(); $History += @{ role = "system"; content = "Expert cyber incident handling analysis. Rule: $ElasticRule. Context: $Context. Verdict: $Verdict" }
+    while ($true) {
+        $In = Read-Host -Prompt "[YOU]"
+        if ($In -eq 'done' -or $In -eq 'exit') { break }
+        $History += @{ role = "user"; content = $In }
+        $Payload = @{ model = $GenAI_Model; messages = $History } | ConvertTo-Json -Depth 10
+        $Res = Invoke-SafeRest -Uri $GenAI_Endpoint -Method Post -Headers @{ "Authorization" = "Bearer $GenAI_Key"; "Content-Type" = "application/json" } -Body $Payload
+        if ($Res) { $Ans = $Res.choices.message.content.Trim(); Write-Host "[AI] $Ans`n" -ForegroundColor Cyan; $History += @{ role = "assistant"; content = $Ans } }
+    }
+}
+
+# --- TICKET GENERATOR ---
+function Write-Ticket {
+    param($Type, $Indicator, $NetName, $Country, $StateProv, $VT, $Abuse, $ISP, $Link, $BdeData, $AI = "", $Descr = "N/A", $ArinH, $ArinT, $MilIP = "N/A", $MilPort = "N/A", $MilNsResult = "N/A", $MilArinH = "N/A", $MilArinN = "N/A", $MilDescr = "N/A", $MilCountry = "N/A", $MilStateProv = "N/A", $MilLink = "N/A")
+    
+    $DomFor = "N/A"
+    if ($Country -eq "US") { $DomFor = "Domestic" } elseif ($Country -ne "N/A") { $DomFor = "Foreign" }
+    
+    # Get Source NSLookup
+    $SrcNsResult = "N/A (Indicator is a Hash)"
+    if ($Type -in @("IP", "URL")) { $SrcNsResult = Get-NsLookup -Target $Indicator }
+
+    $MilLink = "N/A"; if ($MilIP -ne "N/A") { $MilLink = "https://www.whois.com/whois/$MilIP" }
+    
+    $T =  "- AFFECTED LOCATION: $($BdeData.Location)`n"
+    $T += "- AOR STATUS: $($BdeData.AORStatus)`n"
+    $T += "- BDE: $($BdeData.BDE)`n- MACOM: $($BdeData.MACOM)`n- COCOM: NORTHCOM`n- EVENT TIME: (Check Elastic '@timestamp')`n- DIRECTION: Inbound`n- SENSOR: (Check Elastic 'observer.name')`n- PROTOCOL: (Check Elastic)`n"
+    $T += "************************************************************`n"
+    $T += "PAYLOAD: (Check Elastic for 'http.request.body.content')`n"
+    $T += "************************************************************`n"
+    $T += "- KIBANA EVENT GRID [X] HITS WITHIN 4 HRS`n"
+    $T += "************************************************************`n"
+    $T += "Source IP Foreign or Domestic: $DomFor`n`n"
+    $T += "- Source IP: $Indicator ($Type)`n- Source Port: `n- NSLOOKUP: $SrcNsResult`n`n"
+    
+    $T += "--- SOURCE ARIN ---`n"
+    $T += "NetRange:    $ArinH`nNetName:    $NetName`nDescr:    $Descr`nCountry:    $Country`nState/Prov:    $StateProv`n"
+    $T += "WHOIS LINK: $Link`n`n"
+    
+    $T += "- THREAT INTEL:`n"
+    $T += "VirusTotal: $VT`nAbuseIPDB Score: $Abuse`nAbuseIPDB ISP:  $ISP`n"
+    $T += "************************************************************`n"
+    $T += "MIL IP Foreign or domestic: Domestic`n`n"
+    $T += "MIL Destination`n- Destination IP: $MilIP`n- Destination Port: $MilPort`n- NSLOOKUP: $MilNsResult`n`n"
+    
+    $T += "--- DESTINATION (MIL) ARIN ---`n"
+    $T += "NetRange:    $MilArinH`nNetName:    $MilArinN`nDescr:    $MilDescr`nCountry:    $MilCountry`nState/Prov:    $MilStateProv`n"
+    $T += "WHOIS LINK: $MilLink`n"
+    $T += "************************************************************`n"
+    $T += "- MDE:`n"
+    $T += "************************************************************`n"
+    $T += "- CSSP ANALYSIS:`n`n$AI`n`nDespite the action being blocked by an IPS, there are currently no IP-Blocks submitted at the network / IP level. CSSP is submitting a 30-day IP-Block request as an additional countermeasure."
+    
+    # 1. Send plain text to clipboard (so the ticketing system gets clean text)
+    $T | Set-Clipboard
+    
+    # 2. Print to console with N/A highlighted in Red
+    $T_Lines = $T -split "`n"
+    foreach ($Line in $T_Lines) {
+        if ($Line -match "N/A") {
+            $Parts = $Line -split "N/A"
+            for ($i = 0; $i -lt $Parts.Count; $i++) {
+                Write-Host $Parts[$i] -NoNewline -ForegroundColor Green
+                if ($i -lt ($Parts.Count - 1)) {
+                    Write-Host "N/A" -NoNewline -ForegroundColor Red
+                }
+            }
+            Write-Host "" # Newline after the line finishes
+        } else {
+            Write-Host $Line -ForegroundColor Green
+        }
+    }
+    
+    Write-Host "`n[SUCCESS] Exact Layout Ticket copied to clipboard." -ForegroundColor Cyan
+}
+
+# --- MAIN LOOP ---
+while ($true) {
+    Write-Host "`n==================================================" -ForegroundColor Red
+    Write-Host "   CYBER THREAT INTELLIGENCE CO-PILOT v8.2.0" -ForegroundColor Blue
+    Write-Host "==================================================" -ForegroundColor Red
+    $In = Read-Host -Prompt "`nEnter Indicator (Source IP, URL, Hash) or 'Exit'"
+    if ($In -eq 'Exit' -or $In -eq 'exit') { break }
+    $In = $In.Trim()
+    
+    if ($In -match "^(\d{1,3}\.){3}\d{1,3}$") { 
+        # IP ROUTE
+        Write-Host "[!] Analyzing IP: $In..." -ForegroundColor Cyan
+        
+        # 1. Prompt for Destination IP
+        $MilIP = Read-Host -Prompt "Enter MIL Destination IP (or press Enter to skip)"
+        $MilIP = $MilIP.Trim()
+
+        # 2. Prompt for Elastic IPS trigger
+        $ElasticRule = Read-Host -Prompt "Enter Elastic observer.rule.name (or press Enter to skip)"
+        if ([string]::IsNullOrWhiteSpace($ElasticRule)) { $ElasticRule = "None Provided" }
+        
+        # 3. Source IP Threat Intel
+        $AbRes = Invoke-SafeRest -Uri "https://api.abuseipdb.com/api/v2/check?ipAddress=$In&maxAgeInDays=90" -Headers @{ "Key" = $Abuse_Key; "Accept" = "application/json" }
+        $Ab = "N/A"; $ISP = "N/A"; $Cty = "N/A"
+        if ($AbRes) { $Ab = "$($AbRes.data.abuseConfidenceScore)%"; $ISP = $AbRes.data.isp; $Cty = $AbRes.data.countryCode }
+        
+        $Vt = Invoke-SafeRest -Uri "https://www.virustotal.com/api/v3/ip_addresses/$In" -Headers @{ "x-apikey" = $VT_Key }
+        $VTRes = "API Error"; $Owner = "N/A"
+        if ($Vt) { $VTRes = "$($Vt.data.attributes.last_analysis_stats.malicious) Detections"; $Owner = $Vt.data.attributes.as_owner }
+        
+        # 4. Prompt for affected Army installation location.
+        $InputLocation = (Read-Host -Prompt "Enter Affected Location/Base (e.g. 'Liberty')").Trim()
+        $BdeData = Get-BdeInfo -SearchLocation $InputLocation
+
+        # 5. Get RDAP data for Source using the Helper Function
+        $SrcArin = Get-RdapInfo -IP $In
+        
+        # 6. Get RDAP and NSLookup data for MIL Destination using Helper Functions
+        $MilNsResult = "N/A"
+        $MilLink = "N/A"
+        $MilArin = @{ NetRange = "N/A"; NetName = "N/A"; Type = "N/A"; Country = "N/A" }
+        
+        if ($MilIP -match "^(\d{1,3}\.){3}\d{1,3}$") {
+            $MilNsResult = Get-NsLookup -Target $MilIP
+            $MilArin = Get-RdapInfo -IP $MilIP
+            $MilLink = "https://www.whois.com/whois/$MilIP"
+        }
+        
+        $Net = $ISP; if ($Owner -ne "N/A") { $Net = $Owner }
+        $Ctx = "IP:$In, Net:$Net, Abuse:$Ab, VT:$VTRes"
+        if ($MilIP -ne "") { $Ctx += ", TargetIP:$MilIP" }
+        
+        $AI = Invoke-AIAnalysis -ContextData $Ctx -ElasticRule $ElasticRule
+        
+        # 7. Push everything to Write-Ticket
+        Write-Ticket -Type "IP" -Indicator $In -NetName $SrcArin.NetName -Country $Cty -StateProv "N/A" -VT $VTRes -Abuse $Ab -ISP $ISP -Link "https://www.whois.com/whois/$In" -AI $AI -ArinH $SrcArin.NetRange -ArinT $SrcArin.Type `
+                     -MilIP $MilIP -MilNsResult $MilNsResult -MilArinH $MilArin.NetRange -MilArinN $MilArin.NetName -MilCountry $MilArin.Country -MilLink $MilLink -BdeData $BdeData -ElasticRule $ElasticRule
+        if ((Read-Host -Prompt "Follow-up questions? (y/n)") -eq 'y') { Start-AIChat -Context $Ctx -Verdict $AI -ElasticRule $ElasticRule}
+    }
+    elseif ($In -like "*.*" -and $In -notmatch "^([a-fA-F0-9]{64}|[a-fA-F0-9]{32})$") {
+        # URL ROUTE
+        $Domain = $In.Replace("https://","").Replace("http://","").Split("/")[0]
+        Write-Host "[!] Analyzing URL/Domain: $In..." -ForegroundColor Cyan
+        
+        $UsReq = Invoke-SafeRest -Uri "https://urlscan.io/api/v1/scan/" -Method Post -Headers @{ 'API-Key' = $UrlScan_Key; 'Content-Type' = 'application/json' } -Body (@{ url = $In; visibility = "public" } | ConvertTo-Json)
+        $UsVal = "Wait for Report"
+        if ($UsReq) { Start-Sleep -Seconds 20; $UsRes = Invoke-SafeRest -Uri "https://urlscan.io/api/v1/result/$($UsReq.uuid)/"; if ($UsRes) { $UsVal = "Clean"; if ($UsRes.verdicts.overall.malicious) { $UsVal = "Malicious" } } }
+        
+        $Vt = Invoke-SafeRest -Uri "https://www.virustotal.com/api/v3/urls" -Method Post -Headers @{ "x-apikey" = $VT_Key } -Body (@{ url = $In } | ConvertTo-Json)
+        $VTRes = "API Error"
+        if ($Vt) { Start-Sleep -Seconds 15; $VtR = Invoke-SafeRest -Uri "https://www.virustotal.com/api/v3/urls/$($Vt.data.id.Split('-')[1])" -Headers @{ "x-apikey" = $VT_Key }; if ($VtR) { $VTRes = "$($VtR.data.attributes.last_analysis_stats.malicious) Detections" } }
+        
+        $Ctx = "URL:$In, Domain:$Domain, URLScan:$UsVal, VT:$VTRes"
+        $AI = Invoke-AIAnalysis -ContextData $Ctx -ElasticRule $ElasticRule
+        
+        Write-Ticket -Type "URL" -Indicator $In -NetName $Domain -Country "N/A" -VT $VTRes -Abuse $UsVal -ISP "URLScan" -Link "https://www.whois.com/whois/$Domain" -AI $AI -ElasticRule $ElasticRule
+        if ((Read-Host -Prompt "Follow-up questions? (y/n)") -eq 'y') { Start-AIChat -Context $Ctx -Verdict $AI -ElasticRule $ElasticRule}
+    }
+    elseif ($In -match "^([a-fA-F0-9]{64}|[a-fA-F0-9]{32})$") {
+        # HASH ROUTE
+        Write-Host "[!] Analyzing Hash: $In..." -ForegroundColor Cyan
+        $VtH = Invoke-SafeRest -Uri "https://www.virustotal.com/api/v3/files/$In" -Headers @{ "x-apikey" = $VT_Key }
+        $VTHash = "Not Found"
+        if ($VtH) { $VTHash = "$($VtH.data.attributes.last_analysis_stats.malicious) Detections" }
+        
+        $Ctx = "Hash:$In, VT:$VTHash"
+        $AI = Invoke-AIAnalysis -ContextData $Ctx
+        
+        Write-Ticket -CombinedWhois $CombinedWhois -CombinedIntel $CombinedIntel -AI $AI -DomForGlobal $DomForGlobal -MilIP $MilIP -MilNsResult $MilNsResult -MilArin $MilArin -BdeData $BdeData
+        if ((Read-Host -Prompt "`nFollow-up? (y/n)") -eq 'y') { Start-AIChat -Context $JoinedContext -Verdict $AI -ElasticRule $ElasticRule }
+    }
+    else { Write-Host "[ERROR] Unrecognized indicator format." -ForegroundColor Red }
+}
