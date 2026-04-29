@@ -1,0 +1,1 @@
+GenAI Key is scrubbed from this model; user will need to add the API key for their personal or enterprise use. Commercial API keys from Gemini can be utilized if desired; consult the code for #Comments.
