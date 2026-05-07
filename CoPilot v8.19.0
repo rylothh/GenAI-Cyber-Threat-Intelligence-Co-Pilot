@@ -1,6 +1,6 @@
-# --- 1. THE DEFINITIVE "ANALYST'S CO-PILOT" SCRIPT v8.18.0 ---
+# --- 1. THE DEFINITIVE "ANALYST'S CO-PILOT" SCRIPT v8.19.0 ---
 # COMPATIBILITY: Hardened for PS 5.1 CLM.
-# FEATURES: Exact Ticket Match, Triple-Threat WHOIS, Expanded DoD Regex Safety Net.
+# FEATURES: Exact Ticket Match, Triple-Threat WHOIS, Private IP & DoD Safety, Purple Mitigation Section.
 
 $ErrorActionPreference = 'SilentlyContinue'
 
@@ -14,9 +14,9 @@ $Abuse_Key = "56e1443cb048ba5f787bfc3cd8159a76457c0742d9fffcf55ba105972ce2e05c6f
 $Otx_Key = "b9b3ef6fb945cc841c12d2f145b2bb84782b873c36f1da847ce1b20489b8edbc"
 $UrlScan_Key = "019d6e75-932d-7528-a108-90747e17fec3"
 
-# --- GenAI API CONFIGURATION // USE GOOGLE GEMINI IF NOT ON USA GOVT SYSTEM, AND CHECK LINE 20 ---
-$GenAI_Key = "API KEY MUST BE APPLIED BEFORE PROGRAM USAGE"
-$GenAI_Endpoint = "ENDPOINT MUST BE APPLIED BEFORE PROGRAM USAGE"
+# --- GenAI API CONFIGURATION ---
+$GenAI_Key = "Enter Gemini API key here"
+$GenAI_Endpoint = "Enter a Gemini Endpoint URL if you are a non-gov't user"
 $GenAI_Model = "gemini-2.5-flash"
 
 # --- EMBEDDED INTERNAL DATABASE ---
@@ -60,7 +60,7 @@ Ft Gillem GA,93rd BDE,FORSCOM,WITHIN AOR
 Ft Eisenhower GA (Known as Ft Gordon),93rd BDE,TRADOC,WITHIN AOR
 Ft Hamilton NY,93rd BDE,0,WITHIN AOR
 Ft Jackson SC,93rd BDE,TRADOC,WITHIN AOR
-Ft Knox KY,93rd BDE,TRADOC,WITHIN AOR
+HRC Ft Knox KY,93rd BDE,TRADOC,WITHIN AOR
 Ft Gregg-Adams VA (Known as Ft Lee),93rd BDE,TRADOC,WITHIN AOR
 Ft McClellan AL,93rd BDE,TRADOC,WITHIN AOR
 Ft McNair DC,93rd BDE,MDW,WITHIN AOR
@@ -153,7 +153,7 @@ Grand Rapids MI,106th BDE,0,WITHIN AOR
 Grisson AFB IN,106th BDE,0,WITHIN AOR
 Hawthorne NV,106th BDE,AMC,WITHIN AOR
 Hunter-Liggett CA,106th BDE,USARC,WITHIN AOR
-Indianapolis EREC IN,106th BDE,TADLP,WITHIN AOR
+HRC Indianapolis EREC IN,106th BDE,TADLP,WITHIN AOR
 Johnston IA,106th BDE,NGB,WITHIN AOR
 Lake City AAP MO,106th BDE,AMC,WITHIN AOR
 Los Angeles CA,106th BDE,0,WITHIN AOR
@@ -267,7 +267,6 @@ function Test-IsPrivateIP {
 
 function Test-IsDoD {
     param([string]$NetName, [string]$Descr, [string]$Owner, [string]$NsLookup)
-    # Aggressively expanded Regex to catch substring variations (e.g. armystrongstories)
     $DoDRegex = "(?i)\b(DoD|DoDNIC|Department of Defense|DISA|Defense Information Systems Agency|US Army|U\.?S\.? Army|US Navy|U\.?S\.? Navy|US Air Force|U\.?S\.? Air Force|USMC|Marine Corps|Pentagon|Defense Logistics Agency|National Guard)\b|(?i)(\.mil\b|usarmy|usnavy|usaf|usmc|army|navy|airforce|marines|rotc)"
     
     if ($NetName -match $DoDRegex) { return $true }
@@ -394,7 +393,7 @@ function Invoke-AIAnalysis {
     Write-Host "[i] Requesting AI Intelligence Analysis..." -ForegroundColor Magenta
     $Headers = @{ "Authorization" = "Bearer $GenAI_Key"; "Content-Type" = "application/json" }
     
-    $Prompt = "Expert cyber incident handling analysis. Plain text only!!! Avoid usage of unintelligible non-English ascii-style formatting where not commanded in this prompt. Do not use emojis. Do not use HTML/CSS formatting to bold/italics/list or order, etc as it will not work in plaintext. If producing a URL, file hash, or filepath from a potentially malicious payload, obfuscate or defang the URL by placing brackets around the colons, and replace 'https' with 'hxxps' by whatever means necessary to prevent it from highlighting as an embedded URL or hyperlink, to prevent accidental clicking. DO NOT defang or obfuscate IPs. When writing in the 'CSSP Analysis' section, write only your analysis; no extra formatting such as hyphens, linebreaks, etcetera are required, and no title is required as your prompt is pre-formatted to inject into a Powershell script outside of Gemini. Be detailed yet concise. Analyze the provided telemetry based on the text context appended below, which contains pre-gathered open-source intelligence. Do not attempt to run any external lookups yourself. The alert triggered on this Elastic Rule: '$ElasticRule'. 1 paragraph summary assessing the relationship between these indicators and the rule. DO NOT SAY ANYTHING ALONG THE LINES OF 'I, Gemini Enterprise, have analyzed the network telemetry involving source IP 3.5.12.238 and target IP 65.116.218.113.' Do not acknowledge yourself in your analysis. Do not write any suggestions or recommendations; write only the facts that have been observed with open source material." + $ContextData
+    $Prompt = "Expert cyber incident handling analysis. Plain text only!!! Avoid usage of unintelligible non-English ascii-style formatting where not commanded in this prompt. Do not use emojis. Do not use HTML/CSS formatting to bold/italics/list or order, etc as it will not work in plaintext. If producing a URL, file hash, or filepath from a potentially malicious payload, obfuscate or defang the URL by placing brackets around the colons, and replace 'https' with 'hxxps' by whatever means necessary to prevent it from highlighting as an embedded URL or hyperlink, to prevent accidental clicking. DO NOT defang or obfuscate IPs. When writing in the 'CSSP Analysis' section, write only your analysis; no extra formatting such as hyphens, linebreaks, etcetera are required, and no title is required as your prompt is pre-formatted to inject into a Powershell script outside of Gemini. Be detailed yet concise. Analyze the provided telemetry based on the text context appended below, which contains pre-gathered open-source intelligence. Do not attempt to run any external lookups yourself. The alert triggered on this Elastic Rule: '$ElasticRule'. 1 paragraph summary assessing the relationship between these indicators and the rule. DO NOT SAY ANYTHING ALONG THE LINES OF 'I, Gemini Enterprise, have analyzed the network telemetry involving source IP 3.5.12.238 and target IP 65.116.218.113.' Do not acknowledge yourself in your analysis. DO NOT begin your response with titles like 'CSSP Analysis:', 'Analysis:', or 'CSSP ANALYSIS'. Start directly with the first sentence of your analysis. Do not write any suggestions or recommendations; write only the facts that have been observed with open source material." + $ContextData
     
     $Payload = @{ model = $GenAI_Model; messages = @(@{ role = "user"; content = $Prompt }) } | ConvertTo-Json -Depth 10
     $Response = Invoke-SafeRest -Uri $GenAI_Endpoint -Method Post -Headers $Headers -Body $Payload
@@ -423,7 +422,7 @@ function Write-Ticket {
     param(
         $Type, $Indicator, $NetName, $Country, $Descr, $VT, $Abuse, $ISP, $Link, $BdeData, $AI = "", $ArinH, 
         $SrcPort = "N/A", $MilIP = "N/A", $MilPort = "N/A", $Protocol = "N/A", $SrcNsResult = "N/A", $MilNsResult = "N/A", $MilArinH = "N/A", $MilArinN = "N/A", $MilDescr = "N/A", $MilCountry = "N/A", $MilStateProv = "N/A", $MilLink = "N/A", $IsPrivateIP = $false,
-        $Sensor = "N/A", $EventTime = "N/A", $PayloadData = "N/A", $IsDoD = $false
+        $Sensor = "N/A", $EventTime = "N/A", $PayloadData = "N/A", $IsDoD = $false, $ElasticRule = "None Provided"
     )
     
     if ($IsDoD) {
@@ -440,7 +439,9 @@ function Write-Ticket {
     
     $MilLink = "N/A"; if ($MilIP -ne "N/A") { $MilLink = "https://www.whois.com/whois/$MilIP" }
     
-    $T =  "- AFFECTED LOCATION: $($BdeData.Location)`n"
+    # 1. Build The Ticket Text
+    $T =  "AG / $ElasticRule`n`n"
+    $T += "- AFFECTED LOCATION: $($BdeData.Location)`n"
     $T += "- BDE: $($BdeData.BDE)`n- MACOM: $($BdeData.MACOM)`n- COCOM: NORTHCOM`n- EVENT TIME: $EventTime`n- SENSOR: $Sensor`n- PROTOCOL: $Protocol`n"
     $T += "************************************************************`n"
     $T += "PAYLOAD: $PayloadData`n"
@@ -462,7 +463,7 @@ function Write-Ticket {
     $T += "NetRange:    $MilArinH`nNetName:    $MilArinN`nDescr:    $MilDescr`nCountry:    $MilCountry`nState/Prov:    $MilStateProv`n"
     $T += "WHOIS LINK: $MilLink`n"
     
-    # Only include MDE block if the input is NOT an IP
+    # MDE Block
     if ($Type -ne "IP") {
         $T += "************************************************************`n"
         $T += "- MDE:`n"
@@ -472,28 +473,49 @@ function Write-Ticket {
     
     # CSSP Action Logic
     if ($Type -eq "IP" -and $IsDoD) {
-        $T += "- CSSP ANALYSIS:`n`n$AI`n`n[WARNING: Source IP belongs to the Department of Defense (DoD). IP blocking is NOT recommended without explicit authorization.]"
+        $T += "- CSSP ANALYSIS:`n`n$AI`n`n[WARNING: Source IP belongs to the Department of Defense (DoD). IP blocking is NOT recommended without explicit authorization.]`n"
     } elseif ($Type -eq "IP" -and $IsPrivateIP) {
-        $T += "- CSSP ANALYSIS:`n`n$AI`n`n[WARNING: Source IP is an internal/private address. External IP blocking is not applicable.]"
+        $T += "- CSSP ANALYSIS:`n`n$AI`n`n[WARNING: Source IP is an internal/private address. External IP blocking is not applicable.]`n"
     } else {
-        $T += "- CSSP ANALYSIS:`n`n$AI`n`nDespite the action being blocked by an IPS, there are currently no IP-Blocks submitted at the network / IP level. CSSP is submitting a 30-day IP-Block request as an additional countermeasure."
+        $T += "- CSSP ANALYSIS:`n`n$AI`n`nDespite the action being blocked by an IPS, there are currently no IP-Blocks submitted at the network / IP level. CSSP is submitting a 30-day IP-Block request as an additional countermeasure.`n"
     }
 
-    # 1. Send plain text to clipboard
+    # Mitigation Q&A Block
+    $T += "`n1. What was attempted? $ElasticRule`n"
+    $BlockingFactor = if ($Sensor -ne "N/A" -and $Sensor -ne "") { "IPS" } else { "[unanswered]" }
+    $T += "2. What was the blocking factor? $BlockingFactor`n"
+    
+    if ($Type -eq "IP" -and ($IsDoD -or $IsPrivateIP)) {
+        $T += "3. Were additional mitigation factors implemented after attempt? No -- Source is Private/DoD`n"
+    } else {
+        $T += "3. Were additional mitigation factors implemented after attempt? Yes -- 30-day IP block`n"
+    }
+
+    # 2. Send plain text to clipboard
     $T | Set-Clipboard
     
-    # 2. Print to console with N/A highlighted in Red
+    # 3. Dynamic Coloring Print Logic (Red for Missing, Magenta for Q&A, Green for Standard)
     $T_Lines = $T -split "`n"
+    $inPurpleSection = $false
+    
     foreach ($Line in $T_Lines) {
-        if ($Line -match "N/A") {
-            $Parts = $Line -split "N/A"
-            for ($i = 0; $i -lt $Parts.Count; $i++) {
-                Write-Host $Parts[$i] -NoNewline -ForegroundColor Green
-                if ($i -lt ($Parts.Count - 1)) { Write-Host "N/A" -NoNewline -ForegroundColor Red }
+        if ($Line -match "^1\. What was attempted\?") { $inPurpleSection = $true }
+        
+        $lineColor = if ($inPurpleSection) { "Magenta" } else { "Green" }
+        
+        # Regex Split logic catches both N/A and [unanswered] and colors them Red instantly
+        if ($Line -match "N/A|\[unanswered\]") {
+            $Parts = [regex]::Split($Line, "(N/A|\[unanswered\])")
+            foreach ($p in $Parts) {
+                if ($p -eq "N/A" -or $p -eq "[unanswered]") {
+                    Write-Host $p -NoNewline -ForegroundColor Red
+                } elseif ($p -ne "") {
+                    Write-Host $p -NoNewline -ForegroundColor $lineColor
+                }
             }
             Write-Host ""
         } else {
-            Write-Host $Line -ForegroundColor Green
+            Write-Host $Line -ForegroundColor $lineColor
         }
     }
     Write-Host "`n[SUCCESS] Exact Layout Ticket copied to clipboard." -ForegroundColor Cyan
@@ -502,7 +524,7 @@ function Write-Ticket {
 # --- MAIN LOOP ---
 while ($true) {
     Write-Host "`n==================================================" -ForegroundColor Red
-    Write-Host "   CYBER THREAT INTELLIGENCE CO-PILOT v8.18.0" -ForegroundColor Blue
+    Write-Host "   CYBER THREAT INTELLIGENCE CO-PILOT v8.19.0" -ForegroundColor Blue
     Write-Host "==================================================" -ForegroundColor Red
     $In = Clean-Input (Read-Host -Prompt "`nEnter Indicator (Source IP, URL, Hash) or 'Exit'")
     if ($In -eq 'Exit' -or $In -eq 'exit') { break }
@@ -624,7 +646,7 @@ while ($true) {
                          -SrcPort $SrcPort -MilIP $MilIP -MilPort $MilPort -Protocol $InferredProtocol -SrcNsResult $SrcNsResult -MilNsResult $MilNsResult -MilArinH $MilArin.NetRange `
                          -MilArinN $MilArin.NetName -MilDescr $MilArin.Descr -MilCountry $MilArin.Country -MilStateProv $MilArin.StateProv `
                          -MilLink $MilLink -BdeData $BdeData -IsPrivateIP $IsPrivate -IsDoD $IsDoDStatus `
-                         -Sensor $Sensor -EventTime $EventTime -PayloadData $PayloadData
+                         -Sensor $Sensor -EventTime $EventTime -PayloadData $PayloadData -ElasticRule $ElasticRule
                          
             Write-Host "`n[?] Post-Ticket Actions:" -ForegroundColor Yellow
             Write-Host "[r] Re-run AI Analysis (e.g., if API key was locked)"
@@ -664,7 +686,7 @@ while ($true) {
         $AnalyzeLoop = $true
         do {
             $AI = Invoke-AIAnalysis -ContextData $Ctx -ElasticRule $ElasticRule
-            Write-Ticket -Type "URL" -Indicator $In -NetName $Domain -Country "N/A" -Descr "N/A" -VT $VTRes -Abuse $UsVal -ISP "URLScan" -Link "https://www.whois.com/whois/$Domain" -AI $AI -ArinH "N/A" -BdeData $BdeDataBlank -Protocol "N/A" -SrcNsResult $SrcNsResult
+            Write-Ticket -Type "URL" -Indicator $In -NetName $Domain -Country "N/A" -Descr "N/A" -VT $VTRes -Abuse $UsVal -ISP "URLScan" -Link "https://www.whois.com/whois/$Domain" -AI $AI -ArinH "N/A" -BdeData $BdeDataBlank -Protocol "N/A" -SrcNsResult $SrcNsResult -ElasticRule $ElasticRule
             
             Write-Host "`n[?] Post-Ticket Actions:" -ForegroundColor Yellow
             Write-Host "[r] Re-run AI Analysis"
@@ -694,7 +716,7 @@ while ($true) {
         $AnalyzeLoop = $true
         do {
             $AI = Invoke-AIAnalysis -ContextData $Ctx -ElasticRule $ElasticRule
-            Write-Ticket -Type "Hash" -Indicator $In -NetName "N/A" -Country "N/A" -Descr "N/A" -VT $VTHash -Abuse "N/A" -ISP "N/A" -Link "N/A" -AI $AI -ArinH "N/A" -BdeData $BdeDataBlank -Protocol "N/A" -SrcNsResult $SrcNsResult
+            Write-Ticket -Type "Hash" -Indicator $In -NetName "N/A" -Country "N/A" -Descr "N/A" -VT $VTHash -Abuse "N/A" -ISP "N/A" -Link "N/A" -AI $AI -ArinH "N/A" -BdeData $BdeDataBlank -Protocol "N/A" -SrcNsResult $SrcNsResult -ElasticRule $ElasticRule
             
             Write-Host "`n[?] Post-Ticket Actions:" -ForegroundColor Yellow
             Write-Host "[r] Re-run AI Analysis"
