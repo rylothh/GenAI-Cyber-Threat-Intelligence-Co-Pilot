@@ -1,6 +1,6 @@
-# --- 1. THE DEFINITIVE "ANALYST'S CO-PILOT" SCRIPT v8.19.0 ---
+# --- 1. THE DEFINITIVE "ANALYST'S CO-PILOT" SCRIPT v8.23.0 ---
 # COMPATIBILITY: Hardened for PS 5.1 CLM.
-# FEATURES: Exact Ticket Match, Triple-Threat WHOIS, Private IP & DoD Safety, Purple Mitigation Section.
+# FEATURES: Exact Ticket Match, ARIN Trap Bypass, RPSL Formatting, Clickable Quick Links.
 
 $ErrorActionPreference = 'SilentlyContinue'
 
@@ -15,11 +15,37 @@ $Otx_Key = "b9b3ef6fb945cc841c12d2f145b2bb84782b873c36f1da847ce1b20489b8edbc"
 $UrlScan_Key = "019d6e75-932d-7528-a108-90747e17fec3"
 
 # --- GenAI API CONFIGURATION ---
-$GenAI_Key = "Enter Gemini API key here"
-$GenAI_Endpoint = "Enter a Gemini Endpoint URL if you are a non-gov't user"
+$GenAI_Key = "XXX"
+$GenAI_Endpoint = "https://api.genai.mil/v1/chat/completions"
 $GenAI_Model = "gemini-2.5-flash"
 
 # --- EMBEDDED INTERNAL DATABASE ---
+$Global:WhitelistedIPRanges = @(
+    @{ Start = 1754431488; End = 1754464255 }, @{ Start = 1747910656; End = 1747943423 },
+    @{ Start = 225148928; End = 225149951 }, @{ Start = 225150976; End = 225151999 },
+    @{ Start = 225152006; End = 225152006 }, @{ Start = 225120778; End = 225120779 },
+    @{ Start = 225120783; End = 225120783 }, @{ Start = 225116928; End = 225117183 },
+    @{ Start = 225117848; End = 225117849 }, @{ Start = 225117867; End = 225117867 },
+    @{ Start = 225117888; End = 225117888 }, @{ Start = 225132544; End = 225148927 },
+    @{ Start = 225118656; End = 225118656 }, @{ Start = 222730200; End = 222730200 },
+    @{ Start = 222789573; End = 222789573 }, @{ Start = 222885235; End = 222885235 },
+    @{ Start = 222888312; End = 222888312 }, @{ Start = 223051433; End = 223051433 },
+    @{ Start = 223998065; End = 223998065 }, @{ Start = 2214404567; End = 2214404567 },
+    @{ Start = 2230648832; End = 2230714367 }, @{ Start = 2527797248; End = 2527798271 },
+    @{ Start = 2527799296; End = 2527800319 }, @{ Start = 348028928; End = 348045311 },
+    @{ Start = 336863232; End = 336871423 }, @{ Start = 350715904; End = 350724095 },
+    @{ Start = 3427780055; End = 3427780055 }, @{ Start = 392667136; End = 392671231 },
+    @{ Start = 677904384; End = 678035455 }, @{ Start = 678100992; End = 678166527 },
+    @{ Start = 678199296; End = 678232063 }, @{ Start = 679346176; End = 679362559 },
+    @{ Start = 677117952; End = 677249023 }, @{ Start = 677380096; End = 677904383 },
+    @{ Start = 864849813; End = 864849813 }, @{ Start = 864852970; End = 864852970 },
+    @{ Start = 864865214; End = 864865214 }, @{ Start = 864891724; End = 864891724 },
+    @{ Start = 878968832; End = 879230975 }, @{ Start = 879230976; End = 879493119 },
+    @{ Start = 879493120; End = 879755263 }, @{ Start = 879755264; End = 880017407 },
+    @{ Start = 880410624; End = 880541695 }, @{ Start = 888032856; End = 888032856 },
+    @{ Start = 888415656; End = 888415656 }, @{ Start = 878706688; End = 878968831 }
+)
+
 $Global:BdeDataRaw = @"
 Location,BDE,MACOM,AORStatus
 Raven Rock PA,21st BDE,DA,WITHIN AOR
@@ -60,7 +86,7 @@ Ft Gillem GA,93rd BDE,FORSCOM,WITHIN AOR
 Ft Eisenhower GA (Known as Ft Gordon),93rd BDE,TRADOC,WITHIN AOR
 Ft Hamilton NY,93rd BDE,0,WITHIN AOR
 Ft Jackson SC,93rd BDE,TRADOC,WITHIN AOR
-HRC Ft Knox KY,93rd BDE,TRADOC,WITHIN AOR
+Ft Knox KY,93rd BDE,TRADOC,WITHIN AOR
 Ft Gregg-Adams VA (Known as Ft Lee),93rd BDE,TRADOC,WITHIN AOR
 Ft McClellan AL,93rd BDE,TRADOC,WITHIN AOR
 Ft McNair DC,93rd BDE,MDW,WITHIN AOR
@@ -153,7 +179,7 @@ Grand Rapids MI,106th BDE,0,WITHIN AOR
 Grisson AFB IN,106th BDE,0,WITHIN AOR
 Hawthorne NV,106th BDE,AMC,WITHIN AOR
 Hunter-Liggett CA,106th BDE,USARC,WITHIN AOR
-HRC Indianapolis EREC IN,106th BDE,TADLP,WITHIN AOR
+Indianapolis EREC IN,106th BDE,TADLP,WITHIN AOR
 Johnston IA,106th BDE,NGB,WITHIN AOR
 Lake City AAP MO,106th BDE,AMC,WITHIN AOR
 Los Angeles CA,106th BDE,0,WITHIN AOR
@@ -205,7 +231,6 @@ function Clean-Input {
     param([string]$Text)
     if ([string]::IsNullOrWhiteSpace($Text)) { return "" }
     $Text = $Text.Trim()
-    # Safely strip outer quotes ONLY if they surround the entire string.
     if ($Text -match '^"(.*)"$') { $Text = $Matches[1] }
     elseif ($Text -match "^'(.*)'$") { $Text = $Matches[1] }
     return $Text.Trim()
@@ -254,6 +279,28 @@ function Get-NsLookup {
     } else {
         return $NsRaw.Trim()
     }
+}
+
+function Test-IsWhitelisted {
+    param([string]$Indicator)
+    if ([string]::IsNullOrWhiteSpace($Indicator)) { return $false }
+    
+    $Domains = @(".dc.trouter.io")
+    foreach ($d in $Domains) {
+        if ($Indicator -like "*$d*") { return $true }
+    }
+    
+    if ($Indicator -match "^(\d{1,3}\.){3}\d{1,3}$") {
+        $ipOctets = $Indicator.Split('.')
+        $ipInt = ([long]$ipOctets[0] * 16777216) + ([long]$ipOctets[1] * 65536) + ([long]$ipOctets[2] * 256) + [long]$ipOctets[3]
+        
+        foreach ($range in $Global:WhitelistedIPRanges) {
+            if ($ipInt -ge $range.Start -and $ipInt -le $range.End) {
+                return $true
+            }
+        }
+    }
+    return $false
 }
 
 function Test-IsPrivateIP {
@@ -328,37 +375,75 @@ function Unwrap-Arin {
     return [string]$Item
 }
 
-# HELPER: TRIPLE-THREAT RDAP EXTRACTOR
+# HELPER: RECURSIVE VCARD HUNTING FOR NESTED ISP DESCRIPTIONS
+function Find-VCardFn {
+    param($Object)
+    $foundDescr = ""
+    
+    if ($Object -is [array] -or $Object.GetType().Name -eq "Object[]") {
+        foreach ($item in $Object) {
+            $res = Find-VCardFn -Object $item
+            if ($res) { return $res }
+        }
+    } elseif ($Object -is [System.Management.Automation.PSCustomObject] -or $Object -is [hashtable]) {
+        if ($Object.vcardArray) {
+            foreach ($elem in $Object.vcardArray[1]) {
+                if ($elem[0] -eq "fn" -and (-not [string]::IsNullOrWhiteSpace($elem[3]))) {
+                    return $elem[3]
+                }
+            }
+        }
+        foreach ($prop in $Object.PSObject.Properties) {
+            $res = Find-VCardFn -Object $prop.Value
+            if ($res) { return $res }
+        }
+    }
+    return $foundDescr
+}
+
+# HELPER: TRIPLE-THREAT RDAP EXTRACTOR (WITH ARIN BYPASS & RPSL HUNTING)
 function Get-RdapInfo {
     param($IP)
-    $Result = @{ NetRange = "N/A"; NetName = "N/A"; Country = "N/A"; Descr = "N/A"; StateProv = "N/A" }
+    $Result = @{ NetRange = "N/A"; NetName = "N/A"; Country = "N/A"; Descr = "N/A"; StateProv = "N/A"; Route = "N/A"; OriginAS = "N/A"; SourceRegistry = "N/A"; MntBy = "N/A"; LastModified = "N/A" }
     if ([string]::IsNullOrWhiteSpace($IP) -or $IP -eq "N/A") { return $Result }
     
     Write-Host "[!] Querying Registry Data for $IP..." -ForegroundColor Cyan
     
+    # 1. ARIN TRAP BYPASS: Check if ARIN is just a pointer to APNIC/RIPE/AFRINIC/LACNIC
+    $isForeignRir = $false
     $ArinRest = Invoke-SafeRest -Uri "https://whois.arin.net/rest/ip/$($IP).json"
     if ($ArinRest -and $ArinRest.net) {
-        $start = Unwrap-Arin $ArinRest.net.startAddress
-        $end = Unwrap-Arin $ArinRest.net.endAddress
-        if ($start -and $end) { $Result.NetRange = "$start - $end" }
-        
-        $nName = Unwrap-Arin $ArinRest.net.name
-        if ($nName) { $Result.NetName = $nName }
-        
-        if ($ArinRest.net.orgRef.'@name') { $Result.Descr = [string]$ArinRest.net.orgRef.'@name' }
-        
-        $orgUrl = Unwrap-Arin $ArinRest.net.orgRef
-        if ($orgUrl) {
-            $ArinOrg = Invoke-SafeRest -Uri "$($orgUrl).json"
-            if ($ArinOrg -and $ArinOrg.org) {
-                $st = Unwrap-Arin $ArinOrg.org.'iso3166-2'
-                if ($st) { $Result.StateProv = $st }
-                
-                $cty = Unwrap-Arin $ArinOrg.org.'iso3166-1'.code2
-                if ($cty) { $Result.Country = $cty }
+        $orgName = Unwrap-Arin $ArinRest.net.orgRef.'@name'
+        if ($orgName -match "(?i)(Asia Pacific|RIPE|Latin America|African Network|APNIC|LACNIC|AFRINIC|Réseaux IP Européens)") {
+            $isForeignRir = $true
+        } else {
+            # True ARIN Assignment
+            $start = Unwrap-Arin $ArinRest.net.startAddress
+            $end = Unwrap-Arin $ArinRest.net.endAddress
+            if ($start -and $end) { $Result.NetRange = "$start - $end" }
+            
+            $nName = Unwrap-Arin $ArinRest.net.name
+            if ($nName) { $Result.NetName = $nName }
+            if ($orgName) { $Result.Descr = $orgName }
+            
+            $orgUrl = Unwrap-Arin $ArinRest.net.orgRef
+            if ($orgUrl) {
+                $ArinOrg = Invoke-SafeRest -Uri "$($orgUrl).json"
+                if ($ArinOrg -and $ArinOrg.org) {
+                    $st = Unwrap-Arin $ArinOrg.org.'iso3166-2'
+                    if ($st) { $Result.StateProv = $st }
+                    
+                    $cty = Unwrap-Arin $ArinOrg.org.'iso3166-1'.code2
+                    if ($cty) { $Result.Country = $cty }
+                }
             }
         }
     } else {
+        $isForeignRir = $true
+    }
+    
+    # 2. GLOBAL RDAP / FOREIGN IP DEEP DIVE
+    if ($isForeignRir) {
         $RdapGlobal = Invoke-SafeRest -Uri "https://rdap.org/ip/$IP" -Headers @{ "Accept" = "application/rdap+json" }
         if ($RdapGlobal) {
             if ($RdapGlobal.startAddress -and $RdapGlobal.endAddress) { $Result.NetRange = "$($RdapGlobal.startAddress) - $($RdapGlobal.endAddress)" }
@@ -366,11 +451,52 @@ function Get-RdapInfo {
             
             if ($RdapGlobal.name) { $Result.NetName = $RdapGlobal.name }
             if ($RdapGlobal.country) { $Result.Country = $RdapGlobal.country }
+            if ($RdapGlobal.port43) { $Result.SourceRegistry = $RdapGlobal.port43.Replace("whois.","").Replace(".net","").ToUpper() }
             
-            try { if ($RdapGlobal.remarks) { $Result.Descr = $RdapGlobal.remarks[0].description[0] } } catch {}
+            # Extract Route and AS Info if available
+            try { 
+                if ($RdapGlobal.notices) {
+                    foreach ($n in $RdapGlobal.notices) {
+                        if ($n.title -match "related to '(.+?)(AS\d+)'") {
+                            $Result.Route = $Matches[1]
+                            $Result.OriginAS = $Matches[2]
+                        }
+                    }
+                }
+            } catch {}
+            
+            # Extract Last Modified
+            try {
+                if ($RdapGlobal.events) {
+                    foreach ($ev in $RdapGlobal.events) {
+                        if ($ev.eventAction -match 'last changed') { $Result.LastModified = $ev.eventDate; break }
+                    }
+                }
+            } catch {}
+            
+            # Recursive hunt for the formatted name (fn)
+            $FoundVCard = Find-VCardFn -Object $RdapGlobal
+            if (-not [string]::IsNullOrWhiteSpace($FoundVCard)) {
+                $Result.Descr = $FoundVCard
+            } 
+            
+            # Deep Regex on Remarks for RPSL data (route, origin, mnt-by, descr)
+            try {
+                if ($RdapGlobal.remarks) {
+                    foreach ($rem in $RdapGlobal.remarks) {
+                        foreach ($line in $rem.description) {
+                            if ($Result.Descr -eq "N/A" -and (-not ($line -match "^(route|origin|mnt-by|source|last-modified):"))) { $Result.Descr = $line.Trim() }
+                            if ($line -match "^route:\s+(.+)") { $Result.Route = $Matches[1].Trim() }
+                            if ($line -match "^origin:\s+(.+)") { $Result.OriginAS = $Matches[1].Trim() }
+                            if ($line -match "^mnt-by:\s+(.+)") { $Result.MntBy = $Matches[1].Trim() }
+                        }
+                    }
+                }
+            } catch {}
         }
     }
     
+    # 3. HTTPS GEO-IP FALLBACK
     if ($Result.Country -eq "N/A" -or $Result.StateProv -eq "N/A" -or $Result.Descr -eq "N/A") {
         $GeoApi = Invoke-SafeRest -Uri "https://ipapi.co/$IP/json/"
         if ($GeoApi -and (-not $GeoApi.error)) {
@@ -380,7 +506,8 @@ function Get-RdapInfo {
         }
     }
     
-    foreach ($key in @('NetRange', 'NetName', 'Country', 'Descr', 'StateProv')) {
+    # Ensure minimum required fields exist, even if N/A
+    foreach ($key in @('NetRange', 'NetName', 'Country', 'Descr', 'StateProv', 'Route', 'OriginAS', 'SourceRegistry', 'MntBy', 'LastModified')) {
         if ([string]::IsNullOrWhiteSpace($Result[$key])) { $Result[$key] = "N/A" }
     }
     
@@ -420,24 +547,24 @@ function Start-AIChat {
 # --- TICKET GENERATOR ---
 function Write-Ticket {
     param(
-        $Type, $Indicator, $NetName, $Country, $Descr, $VT, $Abuse, $ISP, $Link, $BdeData, $AI = "", $ArinH, 
-        $SrcPort = "N/A", $MilIP = "N/A", $MilPort = "N/A", $Protocol = "N/A", $SrcNsResult = "N/A", $MilNsResult = "N/A", $MilArinH = "N/A", $MilArinN = "N/A", $MilDescr = "N/A", $MilCountry = "N/A", $MilStateProv = "N/A", $MilLink = "N/A", $IsPrivateIP = $false,
-        $Sensor = "N/A", $EventTime = "N/A", $PayloadData = "N/A", $IsDoD = $false, $ElasticRule = "None Provided"
+        $Type, $Indicator, $SrcArin, $VT, $Abuse, $ISP, $Link, $BdeData, $AI = "", 
+        $SrcPort = "N/A", $MilIP = "N/A", $MilPort = "N/A", $Protocol = "N/A", $SrcNsResult = "N/A", $MilNsResult = "N/A", $MilArin, $MilLink = "N/A", $IsPrivateIP = $false,
+        $Sensor = "N/A", $EventTime = "N/A", $PayloadData = "N/A", $IsDoD = $false, $ElasticRule = "None Provided", $IsWhitelisted = $false
     )
     
-    if ($IsDoD) {
+    if ($IsWhitelisted) {
+        $DomFor = "Authorized/Whitelisted"
+    } elseif ($IsDoD) {
         $DomFor = "Domestic (DoD / Military)"
     } elseif ($IsPrivateIP) {
         $DomFor = "Internal/Private (RFC 1918)"
-    } elseif ($Country -eq "US") { 
+    } elseif ($SrcArin.Country -eq "US") { 
         $DomFor = "Domestic" 
-    } elseif ($Country -ne "N/A") { 
+    } elseif ($SrcArin.Country -ne "N/A") { 
         $DomFor = "Foreign" 
     } else {
         $DomFor = "N/A"
     }
-    
-    $MilLink = "N/A"; if ($MilIP -ne "N/A") { $MilLink = "https://www.whois.com/whois/$MilIP" }
     
     # 1. Build The Ticket Text
     $T =  "AG / $ElasticRule`n`n"
@@ -450,29 +577,52 @@ function Write-Ticket {
     $T += "- Source IP: $Indicator ($Type)`n- Source Port: $SrcPort`n- NSLOOKUP: $SrcNsResult`n`n"
     
     $T += "--- SOURCE ARIN ---`n"
-    $T += "NetRange:    $ArinH`nNetName:    $NetName`nDescr:    $Descr`nCountry:    $Country`n"
-    $T += "WHOIS LINK: $Link`n`n"
+    if ($SrcArin.Route -ne "N/A" -and $SrcArin.OriginAS -ne "N/A") {
+        $T += "% Information related to '$($SrcArin.Route)$($SrcArin.OriginAS)'`n"
+        $T += "route:          $($SrcArin.Route)`n"
+        $T += "origin:         $($SrcArin.OriginAS)`n"
+    }
+    $T += "inetnum:        $($SrcArin.NetRange)`n"
+    $T += "netname:        $($SrcArin.NetName)`n"
+    $T += "descr:          $($SrcArin.Descr)`n"
+    $T += "country:        $($SrcArin.Country)`n"
+    if ($SrcArin.MntBy -ne "N/A") { $T += "mnt-by:         $($SrcArin.MntBy)`n" }
+    if ($SrcArin.LastModified -ne "N/A") { $T += "last-modified:  $($SrcArin.LastModified)`n" }
+    if ($SrcArin.SourceRegistry -ne "N/A") { $T += "source:         $($SrcArin.SourceRegistry)`n" }
     
-    $T += "- THREAT INTEL:`n"
+    $T += "`n- THREAT INTEL:`n"
     $T += "VirusTotal: $VT`nAbuseIPDB Score: $Abuse`nAbuseIPDB ISP:  $ISP`n"
     $T += "************************************************************`n"
     $T += "MIL IP Foreign or domestic: Domestic`n`n"
     $T += "MIL Destination`n- Destination IP: $MilIP`n- Destination Port: $MilPort`n- NSLOOKUP: $MilNsResult`n`n"
     
     $T += "--- DESTINATION (MIL) ARIN ---`n"
-    $T += "NetRange:    $MilArinH`nNetName:    $MilArinN`nDescr:    $MilDescr`nCountry:    $MilCountry`nState/Prov:    $MilStateProv`n"
-    $T += "WHOIS LINK: $MilLink`n"
+    if ($MilArin.Route -ne "N/A" -and $MilArin.OriginAS -ne "N/A") {
+        $T += "% Information related to '$($MilArin.Route)$($MilArin.OriginAS)'`n"
+        $T += "route:          $($MilArin.Route)`n"
+        $T += "origin:         $($MilArin.OriginAS)`n"
+    }
+    $T += "inetnum:        $($MilArin.NetRange)`n"
+    $T += "netname:        $($MilArin.NetName)`n"
+    $T += "descr:          $($MilArin.Descr)`n"
+    $T += "country:        $($MilArin.Country)`n"
+    $T += "stateprov:      $($MilArin.StateProv)`n"
+    if ($MilArin.MntBy -ne "N/A") { $T += "mnt-by:         $($MilArin.MntBy)`n" }
+    if ($MilArin.LastModified -ne "N/A") { $T += "last-modified:  $($MilArin.LastModified)`n" }
+    if ($MilArin.SourceRegistry -ne "N/A") { $T += "source:         $($MilArin.SourceRegistry)`n" }
     
     # MDE Block
     if ($Type -ne "IP") {
-        $T += "************************************************************`n"
+        $T += "`n************************************************************`n"
         $T += "- MDE:`n"
     }
     
-    $T += "************************************************************`n"
+    $T += "`n************************************************************`n"
     
     # CSSP Action Logic
-    if ($Type -eq "IP" -and $IsDoD) {
+    if ($IsWhitelisted) {
+        $T += "- CSSP ANALYSIS:`n`n$AI`n`n[WARNING: Source Indicator is explicitly WHITELISTED. IP blocking is NOT recommended.]`n"
+    } elseif ($Type -eq "IP" -and $IsDoD) {
         $T += "- CSSP ANALYSIS:`n`n$AI`n`n[WARNING: Source IP belongs to the Department of Defense (DoD). IP blocking is NOT recommended without explicit authorization.]`n"
     } elseif ($Type -eq "IP" -and $IsPrivateIP) {
         $T += "- CSSP ANALYSIS:`n`n$AI`n`n[WARNING: Source IP is an internal/private address. External IP blocking is not applicable.]`n"
@@ -485,8 +635,8 @@ function Write-Ticket {
     $BlockingFactor = if ($Sensor -ne "N/A" -and $Sensor -ne "") { "IPS" } else { "[unanswered]" }
     $T += "2. What was the blocking factor? $BlockingFactor`n"
     
-    if ($Type -eq "IP" -and ($IsDoD -or $IsPrivateIP)) {
-        $T += "3. Were additional mitigation factors implemented after attempt? No -- Source is Private/DoD`n"
+    if ($IsWhitelisted -or ($Type -eq "IP" -and ($IsDoD -or $IsPrivateIP))) {
+        $T += "3. Were additional mitigation factors implemented after attempt? No -- Source is Protected/Whitelisted`n"
     } else {
         $T += "3. Were additional mitigation factors implemented after attempt? Yes -- 30-day IP block`n"
     }
@@ -494,7 +644,7 @@ function Write-Ticket {
     # 2. Send plain text to clipboard
     $T | Set-Clipboard
     
-    # 3. Dynamic Coloring Print Logic (Red for Missing, Magenta for Q&A, Green for Standard)
+    # 3. Dynamic Coloring Print Logic
     $T_Lines = $T -split "`n"
     $inPurpleSection = $false
     
@@ -503,7 +653,6 @@ function Write-Ticket {
         
         $lineColor = if ($inPurpleSection) { "Magenta" } else { "Green" }
         
-        # Regex Split logic catches both N/A and [unanswered] and colors them Red instantly
         if ($Line -match "N/A|\[unanswered\]") {
             $Parts = [regex]::Split($Line, "(N/A|\[unanswered\])")
             foreach ($p in $Parts) {
@@ -519,12 +668,19 @@ function Write-Ticket {
         }
     }
     Write-Host "`n[SUCCESS] Exact Layout Ticket copied to clipboard." -ForegroundColor Cyan
+    
+    # Quick Links Print Logic
+    if ($Link -ne "N/A" -or $MilLink -ne "N/A") {
+        Write-Host "`n--- QUICK LINKS ---" -ForegroundColor DarkYellow
+        if ($Link -ne "N/A") { Write-Host "Source WHOIS:      $Link" -ForegroundColor Yellow }
+        if ($MilLink -ne "N/A") { Write-Host "Destination WHOIS: $MilLink" -ForegroundColor Yellow }
+    }
 }
 
 # --- MAIN LOOP ---
 while ($true) {
     Write-Host "`n==================================================" -ForegroundColor Red
-    Write-Host "   CYBER THREAT INTELLIGENCE CO-PILOT v8.19.0" -ForegroundColor Blue
+    Write-Host "   CYBER THREAT INTELLIGENCE CO-PILOT v8.23.0" -ForegroundColor Blue
     Write-Host "==================================================" -ForegroundColor Red
     $In = Clean-Input (Read-Host -Prompt "`nEnter Indicator (Source IP, URL, Hash) or 'Exit'")
     if ($In -eq 'Exit' -or $In -eq 'exit') { break }
@@ -541,7 +697,15 @@ while ($true) {
             Write-Host "************************************************************`n" -ForegroundColor Red -BackgroundColor Black
         }
         
-        # 1. State Machine for Inputs with Step-Back feature
+        $IsWhitelisted = Test-IsWhitelisted -Indicator $In
+        if ($IsWhitelisted) { 
+            Write-Host "`n************************************************************" -ForegroundColor Red -BackgroundColor Black
+            Write-Host " [CRITICAL WARNING] WHITELISTED/AUTHORIZED INDICATOR DETECTED " -ForegroundColor White -BackgroundColor Red
+            Write-Host " DO NOT BLOCK THIS IP. PLEASE DOUBLE-CHECK YOUR INDICATOR!  " -ForegroundColor White -BackgroundColor Red
+            Write-Host "************************************************************`n" -ForegroundColor Red -BackgroundColor Black
+        }
+        
+        # 1. State Machine for Inputs
         $step = 1
         while ($step -le 8) {
             switch ($step) {
@@ -604,8 +768,8 @@ while ($true) {
         
         # 2. Open Source Intelligence Lookups
         $AbRes = Invoke-SafeRest -Uri "https://api.abuseipdb.com/api/v2/check?ipAddress=$In&maxAgeInDays=90" -Headers @{ "Key" = $Abuse_Key; "Accept" = "application/json" }
-        $Ab = "N/A"; $ISP = "N/A"; $Cty = "N/A"
-        if ($AbRes) { $Ab = "$($AbRes.data.abuseConfidenceScore)%"; $ISP = $AbRes.data.isp; $Cty = $AbRes.data.countryCode }
+        $Ab = "N/A"; $ISP = "N/A"
+        if ($AbRes) { $Ab = "$($AbRes.data.abuseConfidenceScore)%"; $ISP = $AbRes.data.isp }
         
         $Vt = Invoke-SafeRest -Uri "https://www.virustotal.com/api/v3/ip_addresses/$In" -Headers @{ "x-apikey" = $VT_Key }
         $VTRes = "API Error"; $Owner = "N/A"
@@ -625,7 +789,7 @@ while ($true) {
         }
         
         $MilNsResult = "N/A"; $MilLink = "N/A"
-        $MilArin = @{ NetRange = "N/A"; NetName = "N/A"; Country = "N/A"; Descr = "N/A"; StateProv = "N/A" }
+        $MilArin = @{ NetRange = "N/A"; NetName = "N/A"; Country = "N/A"; Descr = "N/A"; StateProv = "N/A"; Route = "N/A"; OriginAS = "N/A"; SourceRegistry = "N/A"; MntBy = "N/A"; LastModified = "N/A" }
         if ($MilIP -match "^(\d{1,3}\.){3}\d{1,3}$") {
             $MilNsResult = Get-NsLookup -Target $MilIP
             $MilArin = Get-RdapInfo -IP $MilIP
@@ -641,11 +805,10 @@ while ($true) {
         do {
             $AI = Invoke-AIAnalysis -ContextData $Ctx -ElasticRule $ElasticRule
             
-            Write-Ticket -Type "IP" -Indicator $In -NetName $SrcArin.NetName -Country $SrcArin.Country -Descr $SrcArin.Descr `
-                         -VT $VTRes -Abuse $Ab -ISP $ISP -Link "https://www.whois.com/whois/$In" -AI $AI -ArinH $SrcArin.NetRange `
-                         -SrcPort $SrcPort -MilIP $MilIP -MilPort $MilPort -Protocol $InferredProtocol -SrcNsResult $SrcNsResult -MilNsResult $MilNsResult -MilArinH $MilArin.NetRange `
-                         -MilArinN $MilArin.NetName -MilDescr $MilArin.Descr -MilCountry $MilArin.Country -MilStateProv $MilArin.StateProv `
-                         -MilLink $MilLink -BdeData $BdeData -IsPrivateIP $IsPrivate -IsDoD $IsDoDStatus `
+            Write-Ticket -Type "IP" -Indicator $In -SrcArin $SrcArin `
+                         -VT $VTRes -Abuse $Ab -ISP $ISP -Link "https://www.whois.com/whois/$In" -AI $AI `
+                         -SrcPort $SrcPort -MilIP $MilIP -MilPort $MilPort -Protocol $InferredProtocol -SrcNsResult $SrcNsResult -MilNsResult $MilNsResult -MilArin $MilArin `
+                         -MilLink $MilLink -BdeData $BdeData -IsPrivateIP $IsPrivate -IsDoD $IsDoDStatus -IsWhitelisted $IsWhitelisted `
                          -Sensor $Sensor -EventTime $EventTime -PayloadData $PayloadData -ElasticRule $ElasticRule
                          
             Write-Host "`n[?] Post-Ticket Actions:" -ForegroundColor Yellow
@@ -669,6 +832,14 @@ while ($true) {
         $Domain = $In.Replace("https://","").Replace("http://","").Split("/")[0]
         Write-Host "[!] Analyzing URL/Domain: $In..." -ForegroundColor Cyan
         
+        $IsWhitelisted = Test-IsWhitelisted -Indicator $Domain
+        if ($IsWhitelisted) { 
+            Write-Host "`n************************************************************" -ForegroundColor Red -BackgroundColor Black
+            Write-Host " [CRITICAL WARNING] WHITELISTED/AUTHORIZED INDICATOR DETECTED " -ForegroundColor White -BackgroundColor Red
+            Write-Host " DO NOT BLOCK THIS INDICATOR. PLEASE DOUBLE-CHECK YOUR DATA!" -ForegroundColor White -BackgroundColor Red
+            Write-Host "************************************************************`n" -ForegroundColor Red -BackgroundColor Black
+        }
+        
         $BdeDataBlank = @{ Location = "N/A"; BDE = "N/A"; MACOM = "N/A" }
         $ElasticRule = "None Provided"
         $SrcNsResult = Get-NsLookup -Target $Domain
@@ -686,7 +857,8 @@ while ($true) {
         $AnalyzeLoop = $true
         do {
             $AI = Invoke-AIAnalysis -ContextData $Ctx -ElasticRule $ElasticRule
-            Write-Ticket -Type "URL" -Indicator $In -NetName $Domain -Country "N/A" -Descr "N/A" -VT $VTRes -Abuse $UsVal -ISP "URLScan" -Link "https://www.whois.com/whois/$Domain" -AI $AI -ArinH "N/A" -BdeData $BdeDataBlank -Protocol "N/A" -SrcNsResult $SrcNsResult -ElasticRule $ElasticRule
+            $BlankArin = @{ NetRange = "N/A"; NetName = "N/A"; Country = "N/A"; Descr = "N/A"; StateProv = "N/A"; Route = "N/A"; OriginAS = "N/A"; SourceRegistry = "N/A"; MntBy = "N/A"; LastModified = "N/A" }
+            Write-Ticket -Type "URL" -Indicator $In -SrcArin $BlankArin -VT $VTRes -Abuse $UsVal -ISP "URLScan" -Link "https://www.whois.com/whois/$Domain" -AI $AI -BdeData $BdeDataBlank -Protocol "N/A" -SrcNsResult $SrcNsResult -ElasticRule $ElasticRule -IsWhitelisted $IsWhitelisted -MilArin $BlankArin
             
             Write-Host "`n[?] Post-Ticket Actions:" -ForegroundColor Yellow
             Write-Host "[r] Re-run AI Analysis"
@@ -716,7 +888,8 @@ while ($true) {
         $AnalyzeLoop = $true
         do {
             $AI = Invoke-AIAnalysis -ContextData $Ctx -ElasticRule $ElasticRule
-            Write-Ticket -Type "Hash" -Indicator $In -NetName "N/A" -Country "N/A" -Descr "N/A" -VT $VTHash -Abuse "N/A" -ISP "N/A" -Link "N/A" -AI $AI -ArinH "N/A" -BdeData $BdeDataBlank -Protocol "N/A" -SrcNsResult $SrcNsResult -ElasticRule $ElasticRule
+            $BlankArin = @{ NetRange = "N/A"; NetName = "N/A"; Country = "N/A"; Descr = "N/A"; StateProv = "N/A"; Route = "N/A"; OriginAS = "N/A"; SourceRegistry = "N/A"; MntBy = "N/A"; LastModified = "N/A" }
+            Write-Ticket -Type "Hash" -Indicator $In -SrcArin $BlankArin -VT $VTHash -Abuse "N/A" -ISP "N/A" -Link "N/A" -AI $AI -BdeData $BdeDataBlank -Protocol "N/A" -SrcNsResult $SrcNsResult -ElasticRule $ElasticRule -MilArin $BlankArin
             
             Write-Host "`n[?] Post-Ticket Actions:" -ForegroundColor Yellow
             Write-Host "[r] Re-run AI Analysis"
