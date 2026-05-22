@@ -1,2 +1,1 @@
-git add .gitattributes
-*.extension linguist-language=Powershell
+CoPilot v8.19.0.ext linguist-language=PowerShell
